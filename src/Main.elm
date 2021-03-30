@@ -1,7 +1,9 @@
 module Main exposing (..)
 
+import Array exposing (empty)
 import Browser
 import Colors.Opaque as Colors
+import Debug exposing (toString)
 import Element exposing (..)
 import Element.Background as Background
 import Element.Border as Border
@@ -77,6 +79,11 @@ type Profile
     | Step1 Birthplace
     | Step2 Birthplace SkinColor
     | Step3 Birthplace SkinColor Class
+
+
+
+-- profileName : Profile -> String
+-- profileName profile =case profile of
 
 
 type alias Model =
@@ -160,32 +167,40 @@ view model =
             , offset = ( 2, 1 )
             , size = 1
             }
-        , spacing 8
+        , spacing 16
         , width (fillPortion 3)
         ]
-        [ "debug: "
-            ++ Debug.toString model
-            |> text
-            |> el
-                [ Font.italic
-                , Background.color Colors.grey
-                , padding 8
-                , Font.color Colors.white
-                , Border.rounded 4
-                ]
-        , row [ width fill ]
-            [ viewProfile model.profile
-            , Input.button
+        [ row []
+            [ let
+                ( color, action ) =
+                    if model.profile == Empty then
+                        -- make the button 'disabled'
+                        ( Colors.gray, Nothing )
+
+                    else
+                        ( Colors.red, Just (SetProfile Empty) )
+              in
+              Input.button
                 [ Border.width 1
-                , Border.color Colors.red
-                , Font.color Colors.red
+                , Border.color color
+                , Font.color color
                 , padding 8
-                , alignRight
                 ]
                 { label = text "Reset"
-                , onPress = Just <| SetProfile Empty
+                , onPress = action
                 }
+            , "debug: "
+                ++ Debug.toString model
+                |> text
+                |> el
+                    [ Font.italic
+                    , Background.color Colors.grey
+                    , padding 8
+                    , Font.color Colors.white
+                    , Border.rounded 4
+                    ]
             ]
+        , viewProfile model.profile
         ]
 
 
@@ -199,7 +214,7 @@ viewProfile profile =
     in
     case profile of
         Empty ->
-            column []
+            column [ spacing 12 ]
                 [ text "Let put together a lifetime of stuff!"
                 , plainButton
                     []
@@ -209,12 +224,28 @@ viewProfile profile =
                 ]
 
         Step1 birthplace ->
-            column []
-                [ text "Interesting! Let's find out some more immutable characteristics!"
+            column [ spacing 12 ]
+                [ text <| Debug.toString birthplace ++ ", interesting!"
+                , text "Let's find out what you're made of!"
                 , plainButton
                     []
                     { label = text "Let's find out!"
                     , onPress = Just GenStep2
+                    }
+                ]
+
+        Step2 birthplace skinColor ->
+            column [ spacing 12 ]
+                [ text <|
+                    "Wow, "
+                        ++ (String.toLower <| Debug.toString skinColor)
+                        ++ " skin, in "
+                        ++ Debug.toString birthplace
+                        ++ "! Very tasteful."
+                , text "Let's see what your material conditions might be!"
+                , plainButton []
+                    { label = text "Yes, please!"
+                    , onPress = Just GenStep3
                     }
                 ]
 
