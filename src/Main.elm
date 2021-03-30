@@ -15,17 +15,35 @@ import Random.List
 ---- GENERATORS ----
 
 
+randomPick : item -> List item -> Random.Generator item
+randomPick head rest =
+    let
+        list =
+            head :: rest
+    in
+    Random.List.choose list
+        |> Random.map (Tuple.first >> Maybe.withDefault head)
+
+
 genBirthplace : Random.Generator Birthplace
 genBirthplace =
-    Random.List.choose
-        [ Europe
-        , NorthAmerica
+    randomPick Europe
+        [ NorthAmerica
         , SouthAmerica
         , Afrika
         , Asia
         , Australia
         ]
-        |> Random.map (\( mChoice, rest ) -> Maybe.withDefault Europe mChoice)
+
+
+genSkinColor : Birthplace -> Random.Generator SkinColor
+genSkinColor birthplace =
+    randomPick White [ Brown, Black ]
+
+
+genClass : Birthplace -> SkinColor -> Random.Generator Class
+genClass birthplace skinColor =
+    randomPick Lower [ Middle, Upper, Elite ]
 
 
 
@@ -79,7 +97,9 @@ init =
 
 type Msg
     = SetProfile Profile
-    | GenBirthplace
+    | GenStep1
+    | GenStep2
+    | GenStep3
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -92,10 +112,35 @@ update msg model =
         SetProfile profile ->
             simply { model | profile = profile }
 
-        GenBirthplace ->
-            ( model
-            , Random.generate (Step1 >> SetProfile) genBirthplace
-            )
+        GenStep1 ->
+            case model.profile of
+                Empty ->
+                    ( model
+                    , Random.generate (Step1 >> SetProfile) genBirthplace
+                    )
+
+                _ ->
+                    simply model
+
+        GenStep2 ->
+            case model.profile of
+                Step1 birthplace ->
+                    ( model
+                    , Random.generate (Step2 birthplace >> SetProfile) (genSkinColor birthplace)
+                    )
+
+                _ ->
+                    simply model
+
+        GenStep3 ->
+            case model.profile of
+                Step2 birthplace skinColor ->
+                    ( model
+                    , Random.generate (Step3 birthplace skinColor >> SetProfile) (genClass birthplace skinColor)
+                    )
+
+                _ ->
+                    simply model
 
 
 
@@ -146,14 +191,30 @@ view model =
 
 viewProfile : Profile -> Element Msg
 viewProfile profile =
+    let
+        plainButton attrs obj =
+            Input.button
+                ([ Border.width 1, padding 8 ] ++ attrs)
+                obj
+    in
     case profile of
         Empty ->
             column []
                 [ text "Let put together a lifetime of stuff!"
-                , Input.button
-                    [ Border.width 1, padding 8 ]
+                , plainButton
+                    []
                     { label = text "Get a life!"
-                    , onPress = Just GenBirthplace
+                    , onPress = Just GenStep1
+                    }
+                ]
+
+        Step1 birthplace ->
+            column []
+                [ text "Interesting! Let's find out some more immutable characteristics!"
+                , plainButton
+                    []
+                    { label = text "Let's find out!"
+                    , onPress = Just GenStep2
                     }
                 ]
 
