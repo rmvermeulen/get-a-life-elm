@@ -25,11 +25,20 @@ type alias NonEmptyList value =
     ( value, List value )
 
 
+emptyPartialProfile : Profile
+emptyPartialProfile =
+    Partial
+        { mBirth = Nothing
+        , mSkinColor = Nothing
+        , mClass = Nothing
+        }
+
+
 
 ---- DATA ----
 
 
-getWeightedSkinColors : Birthplace -> NonEmptyList (Weighted SkinColor)
+getWeightedSkinColors : Place -> NonEmptyList (Weighted SkinColor)
 getWeightedSkinColors birthplace =
     case birthplace of
         Europe ->
@@ -89,8 +98,8 @@ randomPick ( head, rest ) =
         |> Random.map (Tuple.first >> Maybe.withDefault head)
 
 
-genBirthplace : Random.Generator Birthplace
-genBirthplace =
+genPlace : Random.Generator Place
+genPlace =
     randomPick
         ( Europe
         , [ NorthAmerica
@@ -102,8 +111,8 @@ genBirthplace =
         )
 
 
-genSkinColor : Birthplace -> Random.Generator SkinColor
-genSkinColor birthplace =
+genSkinColor : Place -> Year -> Random.Generator SkinColor
+genSkinColor birthplace year =
     let
         ( head, rest ) =
             getWeightedSkinColors birthplace
@@ -111,26 +120,23 @@ genSkinColor birthplace =
     Random.weighted head rest
 
 
+genBirth : Settings -> Random.Generator Birth
+genBirth { yearRange } =
+    Random.map2 Birth genPlace (genYear yearRange)
 
--- randomPick White [ Brown, Black ]
 
-
-genClass : Birthplace -> SkinColor -> Random.Generator Class
-genClass birthplace skinColor =
+genClass : Place -> SkinColor -> Random.Generator Class
+genClass place skinColor =
     randomPick ( Lower, [ Middle, Upper, Elite ] )
 
 
-genBirthYear : ( Int, Int ) -> Random.Generator BirthYear
-genBirthYear ( from, to ) =
+genYear : ( Int, Int ) -> Random.Generator Year
+genYear ( from, to ) =
     Random.int from to
 
 
 
 ---- MODEL ----
-
-
-type alias BirthYear =
-    Int
 
 
 type Class
@@ -146,7 +152,7 @@ type SkinColor
     | Black
 
 
-type Birthplace
+type Place
     = Europe
     | NorthAmerica
     | SouthAmerica
@@ -155,13 +161,25 @@ type Birthplace
     | Australia
 
 
+type alias Year =
+    Int
+
+
+type alias Birth =
+    { place : Place, year : Year }
+
+
 type Profile
-    = Empty
-    | Step1 Birthplace
-    | Step2 Birthplace SkinColor
-    | Step3 Birthplace SkinColor Class
-    | Step4 Birthplace SkinColor Class Int
-    | FinalStep Summary
+    = Partial
+        { mBirth : Maybe Birth
+        , mSkinColor : Maybe SkinColor
+        , mClass : Maybe Class
+        }
+    | Complete
+        { birth : Birth
+        , skinColor : SkinColor
+        , class : Class
+        }
 
 
 
@@ -182,7 +200,7 @@ type alias Model =
 
 init : ( Model, Cmd Msg )
 init =
-    ( Model Empty (Settings ( 1900, 2020 ))
+    ( Model emptyPartialProfile (Settings ( 1900, 2020 ))
     , Cmd.none
     )
 
@@ -191,22 +209,26 @@ init =
 ---- UPDATE ----
 
 
-type alias Summary =
-    { birthplace : Birthplace, skinColor : SkinColor, class : Class, year : Int }
-
-
 type Msg
     = SetProfile Profile
-    | GenStep1
-    | GenStep2
-    | GenStep3
-    | GenStep4
-    | GenSummary
+    | GenBirth
+    | GenSkinColor Birth
+    | GenClass Birth SkinColor
+    | SetBirth Birth
+    | SetSkinColor SkinColor
+    | SetClass Class
+    | CompleteProfile
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     let
+        perform c =
+            ( model, c )
+
+        generate g m =
+            perform <| Random.generate m g
+
         simply m =
             ( m, Cmd.none )
     in
@@ -214,53 +236,52 @@ update msg model =
         SetProfile profile ->
             simply { model | profile = profile }
 
-        GenStep1 ->
+        GenBirth ->
+            generate (genBirth model.settings) SetBirth
+
+        -- GenBirthplace ->
+        -- GenYear ->
+        GenSkinColor { place, year } ->
+            generate (genSkinColor place year) SetSkinColor
+
+        GenClass { place, year } skinColor ->
+            generate (genClass place skinColor) SetClass
+
+        SetBirth birth ->
+            let
+                profile =
+                    case model.profile of
+                        Complete summary ->
+                            Complete { summary | birth = birth }
+
+                        Partial summary ->
+                            Partial { summary | mBirth = Just birth }
+            in
+            simply { model | profile = profile }
+
+        CompleteProfile ->
             case model.profile of
-                Empty ->
-                    ( model
-                    , Random.generate (Step1 >> SetProfile) genBirthplace
-                    )
+                Partial { mBirth, mSkinColor, mClass } ->
+                    case ( mBirth, mSkinColor, mClass ) of
+                        ( Just birth, Just skinColor, Just class ) ->
+                            simply
+                                { model
+                                    | profile =
+                                        Complete
+                                            { birth = birth
+                                            , skinColor = skinColor
+                                            , class = class
+                                            }
+                                }
+
+                        _ ->
+                            simply model
 
                 _ ->
                     simply model
 
-        GenStep2 ->
-            case model.profile of
-                Step1 birthplace ->
-                    ( model
-                    , Random.generate (Step2 birthplace >> SetProfile) (genSkinColor birthplace)
-                    )
-
-                _ ->
-                    simply model
-
-        GenStep3 ->
-            case model.profile of
-                Step2 birthplace skinColor ->
-                    ( model
-                    , Random.generate (Step3 birthplace skinColor >> SetProfile) (genClass birthplace skinColor)
-                    )
-
-                _ ->
-                    simply model
-
-        GenStep4 ->
-            case model.profile of
-                Step3 birthplace skinColor class ->
-                    ( model
-                    , Random.generate (Step4 birthplace skinColor class >> SetProfile) (genBirthYear model.settings.yearRange)
-                    )
-
-                _ ->
-                    simply model
-
-        GenSummary ->
-            case model.profile of
-                Step4 birthplace skinColor class year ->
-                    simply { model | profile = FinalStep <| Summary birthplace skinColor class year }
-
-                _ ->
-                    simply model
+        _ ->
+            Debug.todo <| "Implement msg " ++ Debug.toString msg
 
 
 
@@ -286,12 +307,13 @@ view model =
         [ row []
             [ let
                 ( color, action ) =
-                    if model.profile == Empty then
-                        -- make the button 'disabled'
-                        ( Colors.gray, Nothing )
+                    case model.profile of
+                        Complete _ ->
+                            -- make the button 'disabled'
+                            ( Colors.gray, Nothing )
 
-                    else
-                        ( Colors.red, Just (SetProfile Empty) )
+                        Partial _ ->
+                            ( Colors.red, Just (SetProfile emptyPartialProfile) )
               in
               Input.button
                 [ Border.width 1
@@ -326,66 +348,40 @@ viewProfile profile =
                 obj
     in
     case profile of
-        Empty ->
-            column [ spacing 12 ]
-                [ text "Let put together a lifetime of stuff!"
-                , plainButton
-                    []
-                    { label = text "Get a life!"
-                    , onPress = Just GenStep1
-                    }
-                ]
+        Partial { mBirth, mSkinColor, mClass } ->
+            let
+                viewEmpty =
+                    column [ spacing 12 ]
+                        [ text "Let put together a lifetime of stuff!"
+                        , plainButton
+                            []
+                            { label = text "Get a life!"
+                            , onPress = Just GenBirth
+                            }
+                        ]
 
-        Step1 birthplace ->
-            column [ spacing 12 ]
-                [ text <| Debug.toString birthplace ++ ", interesting!"
-                , text "Let's find out what you're made of!"
-                , plainButton
-                    []
-                    { label = text "find out"
-                    , onPress = Just GenStep2
-                    }
-                ]
+                viewBirth birth =
+                    let
+                        ps =
+                            Debug.toString birth.place
 
-        Step2 birthplace skinColor ->
-            column [ spacing 12 ]
-                [ text <|
-                    "Wow, "
-                        ++ (String.toLower <| Debug.toString skinColor)
-                        ++ " skin, in "
-                        ++ Debug.toString birthplace
-                        ++ "! Very tasteful."
-                , text "Let's see what your material conditions might be!"
-                , plainButton []
-                    { label = text "See"
-                    , onPress = Just GenStep3
-                    }
-                ]
+                        ys =
+                            String.fromInt birth.year
+                    in
+                    column [ spacing 12 ]
+                        [ text <| ps ++ ", " ++ ys
+                        , plainButton
+                            []
+                            { label = text "What do I look like?"
+                            , onPress = Just <| GenSkinColor birth
+                            }
+                        ]
+            in
+            mBirth
+                |> Maybe.map viewBirth
+                |> Maybe.withDefault viewEmpty
 
-        Step3 birthplace skinColor class ->
-            column [ spacing 12 ]
-                [ text <|
-                    "Right in the "
-                        ++ (String.toLower <| Debug.toString class)
-                        ++ " class, that'll be something!"
-                , text "So, when is all this going on?"
-                , plainButton []
-                    { label = text "Find out"
-                    , onPress = Just GenStep4
-                    }
-                ]
-
-        Step4 birthplace skinColor class year ->
-            column [ spacing 12 ]
-                [ text <| String.fromInt year
-                , text "How exciting!"
-                , plainButton []
-                    { label = text "View summary"
-                    , onPress = Just GenSummary
-                    }
-                ]
-
-        FinalStep summary ->
+        Complete summary ->
             text <| Debug.toString summary
 
 
