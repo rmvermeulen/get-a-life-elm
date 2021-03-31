@@ -14,11 +14,73 @@ import Random.List
 
 
 
+---- HELPERS ----
+
+
+type alias Weighted value =
+    ( Float, value )
+
+
+type alias NonEmptyList value =
+    ( value, List value )
+
+
+
+---- DATA ----
+
+
+getWeightedSkinColors : Birthplace -> NonEmptyList (Weighted SkinColor)
+getWeightedSkinColors birthplace =
+    case birthplace of
+        Europe ->
+            ( ( 90, White )
+            , [ ( 10, Brown )
+              , ( 8, Black )
+              ]
+            )
+
+        NorthAmerica ->
+            ( ( 90, White )
+            , [ ( 10, Brown )
+              , ( 8, Black )
+              ]
+            )
+
+        SouthAmerica ->
+            ( ( 90, Brown )
+            , [ ( 25, White )
+              , ( 20, Black )
+              ]
+            )
+
+        Afrika ->
+            ( ( 90, Black )
+            , [ ( 10, Brown )
+              , ( 8, White )
+              ]
+            )
+
+        Asia ->
+            ( ( 90, Brown )
+            , [ ( 10, White )
+              , ( 10, Black )
+              ]
+            )
+
+        Australia ->
+            ( ( 90, White )
+            , [ ( 10, Brown )
+              , ( 30, Black )
+              ]
+            )
+
+
+
 ---- GENERATORS ----
 
 
-randomPick : item -> List item -> Random.Generator item
-randomPick head rest =
+randomPick : NonEmptyList item -> Random.Generator item
+randomPick ( head, rest ) =
     let
         list =
             head :: rest
@@ -29,23 +91,33 @@ randomPick head rest =
 
 genBirthplace : Random.Generator Birthplace
 genBirthplace =
-    randomPick Europe
-        [ NorthAmerica
-        , SouthAmerica
-        , Afrika
-        , Asia
-        , Australia
-        ]
+    randomPick
+        ( Europe
+        , [ NorthAmerica
+          , SouthAmerica
+          , Afrika
+          , Asia
+          , Australia
+          ]
+        )
 
 
 genSkinColor : Birthplace -> Random.Generator SkinColor
 genSkinColor birthplace =
-    randomPick White [ Brown, Black ]
+    let
+        ( head, rest ) =
+            getWeightedSkinColors birthplace
+    in
+    Random.weighted head rest
+
+
+
+-- randomPick White [ Brown, Black ]
 
 
 genClass : Birthplace -> SkinColor -> Random.Generator Class
 genClass birthplace skinColor =
-    randomPick Lower [ Middle, Upper, Elite ]
+    randomPick ( Lower, [ Middle, Upper, Elite ] )
 
 
 
