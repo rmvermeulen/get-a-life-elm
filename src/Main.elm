@@ -120,8 +120,17 @@ genClass birthplace skinColor =
     randomPick ( Lower, [ Middle, Upper, Elite ] )
 
 
+genBirthYear : ( Int, Int ) -> Random.Generator BirthYear
+genBirthYear ( from, to ) =
+    Random.int from to
+
+
 
 ---- MODEL ----
+
+
+type alias BirthYear =
+    Int
 
 
 type Class
@@ -151,6 +160,8 @@ type Profile
     | Step1 Birthplace
     | Step2 Birthplace SkinColor
     | Step3 Birthplace SkinColor Class
+    | Step4 Birthplace SkinColor Class Int
+    | FinalStep Summary
 
 
 
@@ -158,14 +169,20 @@ type Profile
 -- profileName profile =case profile of
 
 
+type alias Settings =
+    { yearRange : ( Int, Int )
+    }
+
+
 type alias Model =
     { profile : Profile
+    , settings : Settings
     }
 
 
 init : ( Model, Cmd Msg )
 init =
-    ( Model Empty
+    ( Model Empty (Settings ( 1900, 2020 ))
     , Cmd.none
     )
 
@@ -174,11 +191,17 @@ init =
 ---- UPDATE ----
 
 
+type alias Summary =
+    { birthplace : Birthplace, skinColor : SkinColor, class : Class, year : Int }
+
+
 type Msg
     = SetProfile Profile
     | GenStep1
     | GenStep2
     | GenStep3
+    | GenStep4
+    | GenSummary
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -217,6 +240,24 @@ update msg model =
                     ( model
                     , Random.generate (Step3 birthplace skinColor >> SetProfile) (genClass birthplace skinColor)
                     )
+
+                _ ->
+                    simply model
+
+        GenStep4 ->
+            case model.profile of
+                Step3 birthplace skinColor class ->
+                    ( model
+                    , Random.generate (Step4 birthplace skinColor class >> SetProfile) (genBirthYear model.settings.yearRange)
+                    )
+
+                _ ->
+                    simply model
+
+        GenSummary ->
+            case model.profile of
+                Step4 birthplace skinColor class year ->
+                    simply { model | profile = FinalStep <| Summary birthplace skinColor class year }
 
                 _ ->
                     simply model
@@ -301,7 +342,7 @@ viewProfile profile =
                 , text "Let's find out what you're made of!"
                 , plainButton
                     []
-                    { label = text "Let's find out!"
+                    { label = text "find out"
                     , onPress = Just GenStep2
                     }
                 ]
@@ -316,13 +357,36 @@ viewProfile profile =
                         ++ "! Very tasteful."
                 , text "Let's see what your material conditions might be!"
                 , plainButton []
-                    { label = text "Yes, please!"
+                    { label = text "See"
                     , onPress = Just GenStep3
                     }
                 ]
 
-        _ ->
-            text "...todo..."
+        Step3 birthplace skinColor class ->
+            column [ spacing 12 ]
+                [ text <|
+                    "Right in the "
+                        ++ (String.toLower <| Debug.toString class)
+                        ++ " class, that'll be something!"
+                , text "So, when is all this going on?"
+                , plainButton []
+                    { label = text "Find out"
+                    , onPress = Just GenStep4
+                    }
+                ]
+
+        Step4 birthplace skinColor class year ->
+            column [ spacing 12 ]
+                [ text <| String.fromInt year
+                , text "How exciting!"
+                , plainButton []
+                    { label = text "View summary"
+                    , onPress = Just GenSummary
+                    }
+                ]
+
+        FinalStep summary ->
+            text <| Debug.toString summary
 
 
 
