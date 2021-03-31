@@ -428,8 +428,7 @@ viewDebugStuff model =
             -- |> prettyString { indent = 2, columns = 4 }
             -- |> collapse
           in
-          "debug: "
-            ++ json
+          json
             |> text
             |> el
                 [ Font.italic
@@ -533,8 +532,8 @@ viewProfile profile =
             in
             viewBirth
 
-        Complete summary ->
-            text <| Debug.toString summary
+        Complete {} ->
+            text "Summary:"
 
 
 
