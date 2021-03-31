@@ -1,14 +1,14 @@
 module Main exposing (..)
 
-import Array exposing (empty)
 import Browser
 import Colors.Opaque as Colors
-import Debug exposing (toString)
+import DebugToJson
 import Element exposing (..)
 import Element.Background as Background
 import Element.Border as Border
 import Element.Font as Font
 import Element.Input as Input
+import Json.Print
 import Random
 import Random.List
 
@@ -23,6 +23,16 @@ type alias Weighted value =
 
 type alias NonEmptyList value =
     ( value, List value )
+
+
+collapse : Result t t -> t
+collapse result =
+    case result of
+        Ok value ->
+            value
+
+        Err value ->
+            value
 
 
 emptyPartialProfile : Profile
@@ -189,6 +199,10 @@ type Profile
 
 type alias Settings =
     { yearRange : ( Int, Int )
+    , json :
+        { indent : Int
+        , columns : Int
+        }
     }
 
 
@@ -200,7 +214,15 @@ type alias Model =
 
 init : ( Model, Cmd Msg )
 init =
-    ( Model emptyPartialProfile (Settings ( 1900, 2020 ))
+    let
+        settings =
+            Settings
+                ( 1900, 2020 )
+                { indent = 8, columns = 120 }
+    in
+    ( Model
+        emptyPartialProfile
+        settings
     , Cmd.none
     )
 
@@ -218,6 +240,8 @@ type Msg
     | SetSkinColor SkinColor
     | SetClass Class
     | CompleteProfile
+    | SetJsonIndent Int
+    | SetJsonColumns Int
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -304,6 +328,38 @@ update msg model =
                 _ ->
                     simply model
 
+        SetJsonIndent indent ->
+            let
+                newSettings =
+                    let
+                        { settings } =
+                            model
+                    in
+                    { settings
+                        | json =
+                            { indent = indent
+                            , columns = settings.json.columns
+                            }
+                    }
+            in
+            simply { model | settings = newSettings }
+
+        SetJsonColumns columns ->
+            let
+                newSettings =
+                    let
+                        { settings } =
+                            model
+                    in
+                    { settings
+                        | json =
+                            { columns = columns
+                            , indent = settings.json.indent
+                            }
+                    }
+            in
+            simply { model | settings = newSettings }
+
 
 
 ---- VIEW ----
@@ -311,7 +367,7 @@ update msg model =
 
 view : Model -> Element Msg
 view model =
-    column
+    row
         [ centerX
         , Background.color Colors.white
         , padding 10
@@ -325,38 +381,83 @@ view model =
         , spacing 16
         , width (fillPortion 3)
         ]
-        [ row []
-            [ let
-                ( color, action ) =
-                    case model.profile of
-                        Complete _ ->
-                            -- make the button 'disabled'
-                            ( Colors.gray, Nothing )
-
-                        Partial _ ->
-                            ( Colors.red, Just (SetProfile emptyPartialProfile) )
-              in
-              Input.button
-                [ Border.width 1
-                , Border.color color
-                , Font.color color
-                , padding 8
-                ]
-                { label = text "Reset"
-                , onPress = action
-                }
-            , "debug: "
-                ++ Debug.toString model
-                |> text
-                |> el
-                    [ Font.italic
-                    , Background.color Colors.grey
-                    , padding 8
-                    , Font.color Colors.white
-                    , Border.rounded 4
-                    ]
-            ]
+        [ viewDebugStuff model
         , viewProfile model.profile
+        ]
+
+
+viewDebugStuff : Model -> Element Msg
+viewDebugStuff model =
+    let
+        { profile, settings } =
+            model
+    in
+    column []
+        [ let
+            ( color, action ) =
+                case profile of
+                    Complete _ ->
+                        -- make the button 'disabled'
+                        ( Colors.gray, Nothing )
+
+                    Partial _ ->
+                        ( Colors.red, Just (SetProfile emptyPartialProfile) )
+          in
+          Input.button
+            [ Border.width 1
+            , Border.color color
+            , Font.color color
+            , padding 8
+            ]
+            { label = text "Reset"
+            , onPress = action
+            }
+        , let
+            json : String
+            json =
+                model
+                    |> Debug.toString
+                    |> DebugToJson.toJson
+                    |> Result.map
+                        (Json.Print.prettyValue
+                            settings.json
+                            >> collapse
+                        )
+                    |> Result.withDefault "oops"
+
+            -- |> prettyString { indent = 2, columns = 4 }
+            -- |> collapse
+          in
+          "debug: "
+            ++ json
+            |> text
+            |> el
+                [ Font.italic
+                , Font.alignLeft
+                , Font.color Colors.white
+                , Background.color Colors.grey
+                , padding 8
+                , Border.rounded 4
+                , width shrink
+                ]
+        , Input.slider [ padding 10 ]
+            { label = Input.labelLeft [] <| text "indent"
+            , max = 12
+            , min = 0
+            , onChange = Basics.floor >> SetJsonIndent
+            , step = Just 1
+            , thumb = Input.defaultThumb
+            , value = toFloat settings.json.indent
+            }
+        , Input.slider [ padding 10 ]
+            { label = Input.labelLeft [] <| text "columns"
+            , max = 500
+            , min = 0
+            , onChange = Basics.floor >> SetJsonColumns
+            , step = Just 1
+            , thumb = Input.defaultThumb
+            , value = toFloat settings.json.columns
+            }
         ]
 
 
