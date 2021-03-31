@@ -381,7 +381,14 @@ viewProfile profile =
                                 }
 
                         Just class ->
-                            text <| Debug.toString class ++ " class"
+                            column [ spacing 12 ]
+                                [ text <| Debug.toString class ++ " class"
+                                , plainButton
+                                    []
+                                    { label = text "Summarize"
+                                    , onPress = Just CompleteProfile
+                                    }
+                                ]
 
                 viewSkinColor birth =
                     case mSkinColor of
