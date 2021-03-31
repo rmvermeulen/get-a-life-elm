@@ -371,36 +371,59 @@ viewProfile profile =
     case profile of
         Partial { mBirth, mSkinColor, mClass } ->
             let
-                viewEmpty =
-                    column [ spacing 12 ]
-                        [ text "Let put together a lifetime of stuff!"
-                        , plainButton
-                            []
-                            { label = text "Get a life!"
-                            , onPress = Just GenBirth
-                            }
-                        ]
+                viewClass birth skinColor =
+                    case mClass of
+                        Nothing ->
+                            plainButton
+                                []
+                                { label = text "What class am I in?"
+                                , onPress = Just <| GenClass birth skinColor
+                                }
 
-                viewBirth birth =
-                    let
-                        ps =
-                            Debug.toString birth.place
+                        Just class ->
+                            text <| Debug.toString class ++ " class"
 
-                        ys =
-                            String.fromInt birth.year
-                    in
-                    column [ spacing 12 ]
-                        [ text <| ps ++ ", " ++ ys
-                        , plainButton
-                            []
-                            { label = text "What do I look like?"
-                            , onPress = Just <| GenSkinColor birth
-                            }
-                        ]
+                viewSkinColor birth =
+                    case mSkinColor of
+                        Nothing ->
+                            plainButton
+                                []
+                                { label = text "What do I look like?"
+                                , onPress = Just <| GenSkinColor birth
+                                }
+
+                        Just skinColor ->
+                            column [ spacing 12 ]
+                                [ text <| Debug.toString skinColor
+                                , viewClass birth skinColor
+                                ]
+
+                viewBirth =
+                    case mBirth of
+                        Nothing ->
+                            column [ spacing 12 ]
+                                [ text "Let put together a lifetime of stuff!"
+                                , plainButton
+                                    []
+                                    { label = text "Get a life!"
+                                    , onPress = Just GenBirth
+                                    }
+                                ]
+
+                        Just birth ->
+                            let
+                                ps =
+                                    Debug.toString birth.place
+
+                                ys =
+                                    String.fromInt birth.year
+                            in
+                            column [ spacing 12 ]
+                                [ text <| ps ++ ", " ++ ys
+                                , viewSkinColor birth
+                                ]
             in
-            mBirth
-                |> Maybe.map viewBirth
-                |> Maybe.withDefault viewEmpty
+            viewBirth
 
         Complete summary ->
             text <| Debug.toString summary
