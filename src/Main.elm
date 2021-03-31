@@ -259,6 +259,30 @@ update msg model =
             in
             simply { model | profile = profile }
 
+        SetSkinColor skinColor ->
+            let
+                profile =
+                    case model.profile of
+                        Complete summary ->
+                            Complete { summary | skinColor = skinColor }
+
+                        Partial summary ->
+                            Partial { summary | mSkinColor = Just skinColor }
+            in
+            simply { model | profile = profile }
+
+        SetClass class ->
+            let
+                profile =
+                    case model.profile of
+                        Complete summary ->
+                            Complete { summary | class = class }
+
+                        Partial summary ->
+                            Partial { summary | mClass = Just class }
+            in
+            simply { model | profile = profile }
+
         CompleteProfile ->
             case model.profile of
                 Partial { mBirth, mSkinColor, mClass } ->
@@ -279,9 +303,6 @@ update msg model =
 
                 _ ->
                     simply model
-
-        _ ->
-            Debug.todo <| "Implement msg " ++ Debug.toString msg
 
 
 
