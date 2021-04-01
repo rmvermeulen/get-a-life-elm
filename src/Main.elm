@@ -199,6 +199,7 @@ type Profile
 
 type alias Settings =
     { yearRange : ( Int, Int )
+    , previewEnabled : Bool
     , json :
         { indent : Int
         , columns : Int
@@ -218,7 +219,8 @@ init =
         settings =
             Settings
                 ( 1900, 2020 )
-                { indent = 8, columns = 120 }
+                True
+                { indent = 2, columns = 120 }
     in
     ( Model
         emptyPartialProfile
@@ -242,6 +244,9 @@ type Msg
     | CompleteProfile
     | SetJsonIndent Int
     | SetJsonColumns Int
+    | ShowModel
+    | HideModel
+    | SetModelPreviewEnabled Bool
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -360,6 +365,22 @@ update msg model =
             in
             simply { model | settings = newSettings }
 
+        ShowModel ->
+            update (SetModelPreviewEnabled True) model
+
+        HideModel ->
+            update (SetModelPreviewEnabled False) model
+
+        SetModelPreviewEnabled enabled ->
+            let
+                { settings } =
+                    model
+
+                newSettings =
+                    { settings | previewEnabled = enabled }
+            in
+            simply { model | settings = newSettings }
+
 
 
 ---- VIEW ----
@@ -367,23 +388,22 @@ update msg model =
 
 view : Model -> Element Msg
 view model =
-    row
-        [ centerX
-        , Background.color Colors.white
-        , padding 10
-        , Border.width 1
-        , Border.shadow
-            { blur = 4
-            , color = Colors.black
-            , offset = ( 2, 1 )
-            , size = 1
-            }
-        , spacing 16
-        , width (fillPortion 3)
-        ]
-        [ viewDebugStuff model
-        , viewProfile model.profile
-        ]
+    viewProfile model.profile
+        |> el
+            [ centerX
+            , alignTop
+            , Background.color Colors.white
+            , padding 12
+            , Border.width 1
+            , Border.shadow
+                { blur = 4
+                , color = Colors.black
+                , offset = ( 2, 1 )
+                , size = 1
+                }
+            , spacing 16
+            , width shrink
+            ]
 
 
 viewDebugStuff : Model -> Element Msg
@@ -391,73 +411,98 @@ viewDebugStuff model =
     let
         { profile, settings } =
             model
-    in
-    column []
-        [ let
-            ( color, action ) =
-                case profile of
-                    Complete _ ->
-                        -- make the button 'disabled'
-                        ( Colors.gray, Nothing )
 
-                    Partial _ ->
-                        ( Colors.red, Just (SetProfile emptyPartialProfile) )
-          in
-          Input.button
-            [ Border.width 1
-            , Border.color color
-            , Font.color color
-            , padding 8
-            ]
-            { label = text "Reset"
-            , onPress = action
-            }
-        , let
-            json : String
-            json =
-                model
-                    |> Debug.toString
-                    |> DebugToJson.toJson
-                    |> Result.map
-                        (Json.Print.prettyValue
-                            settings.json
-                            >> collapse
-                        )
-                    |> Result.withDefault "oops"
+        resetButton =
+            let
+                ( color, action ) =
+                    case profile of
+                        Complete _ ->
+                            -- make the button 'disabled'
+                            ( Colors.gray, Nothing )
 
-            -- |> prettyString { indent = 2, columns = 4 }
-            -- |> collapse
-          in
-          json
-            |> text
-            |> el
-                [ Font.italic
-                , Font.alignLeft
-                , Font.color Colors.white
-                , Background.color Colors.grey
+                        Partial _ ->
+                            ( Colors.red, Just (SetProfile emptyPartialProfile) )
+            in
+            Input.button
+                [ Border.width 1
+                , Border.color color
+                , Font.color color
                 , padding 8
-                , Border.rounded 4
-                , width shrink
                 ]
-        , Input.slider [ padding 10 ]
-            { label = Input.labelLeft [] <| text "indent"
-            , max = 12
-            , min = 0
-            , onChange = Basics.floor >> SetJsonIndent
-            , step = Just 1
-            , thumb = Input.defaultThumb
-            , value = toFloat settings.json.indent
-            }
-        , Input.slider [ padding 10 ]
-            { label = Input.labelLeft [] <| text "columns"
-            , max = 500
-            , min = 0
-            , onChange = Basics.floor >> SetJsonColumns
-            , step = Just 1
-            , thumb = Input.defaultThumb
-            , value = toFloat settings.json.columns
-            }
+                { label = text "Reset"
+                , onPress = action
+                }
+    in
+    el
+        [ Background.color Colors.darkYellow2
+        , padding 12
         ]
+    <|
+        if settings.previewEnabled then
+            column []
+                [ row []
+                    [ resetButton
+                    , Input.button
+                        []
+                        { label = text "Hide model"
+                        , onPress = Just HideModel
+                        }
+                    ]
+                , let
+                    json : String
+                    json =
+                        model
+                            |> Debug.toString
+                            |> DebugToJson.toJson
+                            |> Result.map
+                                (Json.Print.prettyValue
+                                    settings.json
+                                    >> collapse
+                                )
+                            |> Result.withDefault "oops"
+
+                    -- |> prettyString { indent = 2, columns = 4 }
+                    -- |> collapse
+                  in
+                  json
+                    |> text
+                    |> el
+                        [ Font.italic
+                        , Font.alignLeft
+                        , Font.color Colors.white
+                        , Background.color Colors.grey
+                        , padding 8
+                        , Border.rounded 4
+                        , width shrink
+                        ]
+                , Input.slider [ padding 10 ]
+                    { label = Input.labelLeft [] <| text "indent"
+                    , max = 12
+                    , min = 0
+                    , onChange = Basics.floor >> SetJsonIndent
+                    , step = Just 1
+                    , thumb = Input.defaultThumb
+                    , value = toFloat settings.json.indent
+                    }
+                , Input.slider [ padding 10 ]
+                    { label = Input.labelLeft [] <| text "columns"
+                    , max = 500
+                    , min = 0
+                    , onChange = Basics.floor >> SetJsonColumns
+                    , step = Just 1
+                    , thumb = Input.defaultThumb
+                    , value = toFloat settings.json.columns
+                    }
+                ]
+
+        else
+            row []
+                [ resetButton
+                , Input.button []
+                    { label = text "Show model"
+                    , onPress = Just ShowModel
+                    }
+                ]
 
 
 viewProfile : Profile -> Element Msg
@@ -532,7 +577,7 @@ viewProfile profile =
             in
             viewBirth
 
-        Complete {} ->
+        Complete { birth } ->
             text "Summary:"
 
 
