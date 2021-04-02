@@ -1,7 +1,9 @@
-module AnimatedButton exposing (Msg, State)
+module AnimatedButton exposing (Model, Msg, init, subscriptions, update, view)
 
 import Animator
 import Dict exposing (Dict)
+import Element as E exposing (Element)
+import Element.Input as Input
 import Time
 
 
@@ -42,15 +44,37 @@ init _ =
     ( model, Cmd.none )
 
 
-update : Msg -> Model -> ( Model, Cmd Msg )
+update : Msg -> Model -> Model
 update msg model =
-    let
-        simply m =
-            ( m, Cmd.none )
-    in
     case msg of
         RuntimeTriggeredAnimationStep delta ->
-            simply model
+            model
 
-        _ ->
-            simply model
+        ButtonHoverStart id ->
+            model
+
+        ButtonHoverEnd id ->
+            model
+
+
+view : Model -> Element Msg
+view model =
+    Input.button []
+        { label = E.text "animated button"
+        , onPress = Nothing
+        }
+
+
+animator : Animator.Animator Model
+animator =
+    Animator.animator
+        |> Animator.watchingWith .states
+            (\newStates model ->
+                { model | states = newStates }
+            )
+            (\states -> List.any ((==) Hover) <| Dict.values states)
+
+
+subscriptions : Model -> Sub Msg
+subscriptions model =
+    Animator.toSubscription RuntimeTriggeredAnimationStep model animator

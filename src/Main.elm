@@ -1,5 +1,6 @@
 module Main exposing (..)
 
+import AnimatedButton
 import Animation
 import Browser
 import Colors.Opaque as Colors
@@ -292,6 +293,7 @@ type alias Model =
     { profile : Profile
     , settings : Settings
     , style : Animation.State
+    , button : AnimatedButton.Model
     }
 
 
@@ -308,12 +310,16 @@ init =
             Animation.style
                 [ Animation.width (Animation.px 200)
                 ]
+
+        ( button, abCmd ) =
+            AnimatedButton.init ()
     in
     ( Model
         emptyPartialProfile
         settings
         style
-    , Cmd.none
+        button
+    , Cmd.batch [ abCmd |> Cmd.map AnimatedButtonMsg ]
     )
 
 
@@ -331,6 +337,7 @@ type Msg
     | SetClass Class
     | CompleteProfile
     | Animate Animation.Msg
+    | AnimatedButtonMsg AnimatedButton.Msg
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -443,6 +450,9 @@ update msg model =
         Animate animMsg ->
             simply { model | style = Animation.update animMsg model.style }
 
+        AnimatedButtonMsg abMsg ->
+            simply { model | button = AnimatedButton.update abMsg model.button }
+
 
 
 ---- VIEW ----
@@ -456,24 +466,27 @@ view model =
                 |> List.map E.htmlAttribute
                 |> List.map (E.mapAttribute Animate)
     in
-    viewProfile model.profile
-        |> E.el
-            (animations
-                ++ [ E.centerX
-                   , E.alignTop
-                   , Background.color Colors.white
-                   , E.padding 12
-                   , Border.width 1
-                   , Border.shadow
-                        { blur = 4
-                        , color = Colors.black
-                        , offset = ( 2, 1 )
-                        , size = 1
-                        }
-                   , E.spacing 16
-                   , E.width E.shrink
-                   ]
-            )
+    E.column
+        (animations
+            ++ [ E.centerX
+               , E.alignTop
+               , Background.color Colors.white
+               , E.padding 12
+               , Border.width 1
+               , Border.shadow
+                    { blur = 4
+                    , color = Colors.black
+                    , offset = ( 2, 1 )
+                    , size = 1
+                    }
+               , E.spacing 16
+               , E.width E.shrink
+               ]
+        )
+        [ viewProfile model.profile
+        , AnimatedButton.view model.button
+            |> E.map AnimatedButtonMsg
+        ]
 
 
 viewProfile : Profile -> Element Msg
@@ -556,7 +569,12 @@ viewProfile profile =
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
-    Animation.subscription Animate [ model.style ]
+    Sub.batch
+        [ Animation.subscription Animate
+            [ model.style ]
+        , AnimatedButton.subscriptions model.button
+            |> Sub.map AnimatedButtonMsg
+        ]
 
 
 
