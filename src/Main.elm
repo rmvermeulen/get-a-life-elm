@@ -1,20 +1,101 @@
 module Main exposing (..)
 
+import Animation
 import Browser
 import Colors.Opaque as Colors
-import DebugToJson
 import Element exposing (..)
 import Element.Background as Background
 import Element.Border as Border
-import Element.Font as Font
 import Element.Input as Input
-import Json.Print
 import Random
 import Random.List
 
 
 
 ---- HELPERS ----
+
+
+classToString : Class -> String
+classToString class =
+    case class of
+        Lower ->
+            "Lower"
+
+        Middle ->
+            "Middle"
+
+        Upper ->
+            "Upper"
+
+        Elite ->
+            "Elite"
+
+
+skinColorToString : SkinColor -> String
+skinColorToString skin =
+    case skin of
+        White ->
+            "White"
+
+        Brown ->
+            "Brown"
+
+        Black ->
+            "Black"
+
+
+placeToString : Place -> String
+placeToString place =
+    case place of
+        Afrika ->
+            "Afrika"
+
+        Asia ->
+            "Asia"
+
+        Australia ->
+            "Australia"
+
+        Europe ->
+            "Europe"
+
+        NorthAmerica ->
+            "North America"
+
+        SouthAmerica ->
+            "South America"
+
+
+yearToString : Year -> String
+yearToString year =
+    String.fromInt year
+
+
+birthToString : Birth -> String
+birthToString { place, year } =
+    placeToString place ++ ", " ++ yearToString year
+
+
+getBoxWidth : Profile -> Float
+getBoxWidth profile =
+    case profile of
+        Complete _ ->
+            200
+
+        Partial { mBirth, mClass, mSkinColor } ->
+            [ mBirth |> Maybe.map birthToString
+            , mClass |> Maybe.map classToString
+            , mSkinColor |> Maybe.map skinColorToString
+            ]
+                -- find the longest string's length
+                |> List.filterMap
+                    (Maybe.map <| String.length >> toFloat)
+                |> (List.sort >> List.reverse >> List.head)
+                |> Maybe.withDefault 10
+                -- character width, roughly
+                |> (*) 12
+                -- add double the padding
+                |> (+) 32
 
 
 type alias Weighted value =
@@ -122,7 +203,7 @@ genPlace =
 
 
 genSkinColor : Place -> Year -> Random.Generator SkinColor
-genSkinColor birthplace year =
+genSkinColor birthplace _ =
     let
         ( head, rest ) =
             getWeightedSkinColors birthplace
@@ -136,7 +217,7 @@ genBirth { yearRange } =
 
 
 genClass : Place -> SkinColor -> Random.Generator Class
-genClass place skinColor =
+genClass _ _ =
     randomPick ( Lower, [ Middle, Upper, Elite ] )
 
 
@@ -210,6 +291,7 @@ type alias Settings =
 type alias Model =
     { profile : Profile
     , settings : Settings
+    , style : Animation.State
     }
 
 
@@ -221,10 +303,16 @@ init =
                 ( 1900, 2020 )
                 True
                 { indent = 2, columns = 120 }
+
+        style =
+            Animation.style
+                [ Animation.width (Animation.px 200)
+                ]
     in
     ( Model
         emptyPartialProfile
         settings
+        style
     , Cmd.none
     )
 
@@ -242,11 +330,7 @@ type Msg
     | SetSkinColor SkinColor
     | SetClass Class
     | CompleteProfile
-    | SetJsonIndent Int
-    | SetJsonColumns Int
-    | ShowModel
-    | HideModel
-    | SetModelPreviewEnabled Bool
+    | Animate Animation.Msg
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -260,6 +344,16 @@ update msg model =
 
         simply m =
             ( m, Cmd.none )
+
+        animateBox profile =
+            Animation.interrupt
+                [ Animation.to
+                    [ Animation.width <|
+                        Animation.px <|
+                            getBoxWidth profile
+                    ]
+                ]
+                model.style
     in
     case msg of
         SetProfile profile ->
@@ -273,7 +367,7 @@ update msg model =
         GenSkinColor { place, year } ->
             generate (genSkinColor place year) SetSkinColor
 
-        GenClass { place, year } skinColor ->
+        GenClass { place } skinColor ->
             generate (genClass place skinColor) SetClass
 
         SetBirth birth ->
@@ -285,8 +379,11 @@ update msg model =
 
                         Partial summary ->
                             Partial { summary | mBirth = Just birth }
+
+                style =
+                    animateBox profile
             in
-            simply { model | profile = profile }
+            simply { model | profile = profile, style = style }
 
         SetSkinColor skinColor ->
             let
@@ -297,8 +394,15 @@ update msg model =
 
                         Partial summary ->
                             Partial { summary | mSkinColor = Just skinColor }
+
+                style =
+                    animateBox profile
             in
-            simply { model | profile = profile }
+            simply
+                { model
+                    | profile = profile
+                    , style = style
+                }
 
         SetClass class ->
             let
@@ -309,8 +413,11 @@ update msg model =
 
                         Partial summary ->
                             Partial { summary | mClass = Just class }
+
+                style =
+                    animateBox profile
             in
-            simply { model | profile = profile }
+            simply { model | profile = profile, style = style }
 
         CompleteProfile ->
             case model.profile of
@@ -333,53 +440,8 @@ update msg model =
                 _ ->
                     simply model
 
-        SetJsonIndent indent ->
-            let
-                newSettings =
-                    let
-                        { settings } =
-                            model
-                    in
-                    { settings
-                        | json =
-                            { indent = indent
-                            , columns = settings.json.columns
-                            }
-                    }
-            in
-            simply { model | settings = newSettings }
-
-        SetJsonColumns columns ->
-            let
-                newSettings =
-                    let
-                        { settings } =
-                            model
-                    in
-                    { settings
-                        | json =
-                            { columns = columns
-                            , indent = settings.json.indent
-                            }
-                    }
-            in
-            simply { model | settings = newSettings }
-
-        ShowModel ->
-            update (SetModelPreviewEnabled True) model
-
-        HideModel ->
-            update (SetModelPreviewEnabled False) model
-
-        SetModelPreviewEnabled enabled ->
-            let
-                { settings } =
-                    model
-
-                newSettings =
-                    { settings | previewEnabled = enabled }
-            in
-            simply { model | settings = newSettings }
+        Animate animMsg ->
+            simply { model | style = Animation.update animMsg model.style }
 
 
 
@@ -388,121 +450,30 @@ update msg model =
 
 view : Model -> Element Msg
 view model =
+    let
+        animations =
+            Animation.render model.style
+                |> List.map htmlAttribute
+                |> List.map (mapAttribute Animate)
+    in
     viewProfile model.profile
         |> el
-            [ centerX
-            , alignTop
-            , Background.color Colors.white
-            , padding 12
-            , Border.width 1
-            , Border.shadow
-                { blur = 4
-                , color = Colors.black
-                , offset = ( 2, 1 )
-                , size = 1
-                }
-            , spacing 16
-            , width shrink
-            ]
-
-
-viewDebugStuff : Model -> Element Msg
-viewDebugStuff model =
-    let
-        { profile, settings } =
-            model
-
-        resetButton =
-            let
-                ( color, action ) =
-                    case profile of
-                        Complete _ ->
-                            -- make the button 'disabled'
-                            ( Colors.gray, Nothing )
-
-                        Partial _ ->
-                            ( Colors.red, Just (SetProfile emptyPartialProfile) )
-            in
-            Input.button
-                [ Border.width 1
-                , Border.color color
-                , Font.color color
-                , padding 8
-                ]
-                { label = text "Reset"
-                , onPress = action
-                }
-    in
-    el
-        [ Background.color Colors.darkYellow2
-        , padding 12
-        ]
-    <|
-        if settings.previewEnabled then
-            column []
-                [ row []
-                    [ resetButton
-                    , Input.button
-                        []
-                        { label = text "Hide model"
-                        , onPress = Just HideModel
+            (animations
+                ++ [ centerX
+                   , alignTop
+                   , Background.color Colors.white
+                   , padding 12
+                   , Border.width 1
+                   , Border.shadow
+                        { blur = 4
+                        , color = Colors.black
+                        , offset = ( 2, 1 )
+                        , size = 1
                         }
-                    ]
-                , let
-                    json : String
-                    json =
-                        model
-                            |> Debug.toString
-                            |> DebugToJson.toJson
-                            |> Result.map
-                                (Json.Print.prettyValue
-                                    settings.json
-                                    >> collapse
-                                )
-                            |> Result.withDefault "oops"
-
-                    -- |> prettyString { indent = 2, columns = 4 }
-                    -- |> collapse
-                  in
-                  json
-                    |> text
-                    |> el
-                        [ Font.italic
-                        , Font.alignLeft
-                        , Font.color Colors.white
-                        , Background.color Colors.grey
-                        , padding 8
-                        , Border.rounded 4
-                        , width shrink
-                        ]
-                , Input.slider [ padding 10 ]
-                    { label = Input.labelLeft [] <| text "indent"
-                    , max = 12
-                    , min = 0
-                    , onChange = Basics.floor >> SetJsonIndent
-                    , step = Just 1
-                    , thumb = Input.defaultThumb
-                    , value = toFloat settings.json.indent
-                    }
-                , Input.slider [ padding 10 ]
-                    { label = Input.labelLeft [] <| text "columns"
-                    , max = 500
-                    , min = 0
-                    , onChange = Basics.floor >> SetJsonColumns
-                    , step = Just 1
-                    , thumb = Input.defaultThumb
-                    , value = toFloat settings.json.columns
-                    }
-                ]
-
-        else
-            row []
-                [ resetButton
-                , Input.button []
-                    { label = text "Show model"
-                    , onPress = Just ShowModel
-                    }
-                ]
+                   , spacing 16
+                   , width shrink
+                   ]
+            )
 
 
 viewProfile : Profile -> Element Msg
@@ -527,7 +498,7 @@ viewProfile profile =
 
                         Just class ->
                             column [ spacing 12 ]
-                                [ text <| Debug.toString class ++ " class"
+                                [ text <| classToString class ++ " class"
                                 , plainButton
                                     []
                                     { label = text "Summarize"
@@ -546,7 +517,7 @@ viewProfile profile =
 
                         Just skinColor ->
                             column [ spacing 12 ]
-                                [ text <| Debug.toString skinColor
+                                [ text <| skinColorToString skinColor
                                 , viewClass birth skinColor
                                 ]
 
@@ -563,22 +534,29 @@ viewProfile profile =
                                 ]
 
                         Just birth ->
-                            let
-                                ps =
-                                    Debug.toString birth.place
-
-                                ys =
-                                    String.fromInt birth.year
-                            in
                             column [ spacing 12 ]
-                                [ text <| ps ++ ", " ++ ys
+                                [ text <| birthToString birth
                                 , viewSkinColor birth
                                 ]
             in
             viewBirth
 
-        Complete { birth } ->
-            text "Summary:"
+        Complete { birth, class, skinColor } ->
+            column []
+                [ text "Summary:"
+                , birth |> birthToString |> text
+                , class |> classToString |> text
+                , skinColor |> skinColorToString |> text
+                ]
+
+
+
+---- SUBSCRIPTIONS ----
+
+
+subscriptions : Model -> Sub Msg
+subscriptions model =
+    Animation.subscription Animate [ model.style ]
 
 
 
@@ -597,5 +575,5 @@ main =
                     ]
         , init = \_ -> init
         , update = update
-        , subscriptions = always Sub.none
+        , subscriptions = subscriptions
         }

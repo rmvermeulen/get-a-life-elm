@@ -13,12 +13,14 @@
             "elm/random": "1.0.0",
             "elm-community/random-extra": "3.2.0",
             "f0i/debug-to-json": "1.0.6",
+            "mdgriffith/elm-style-animation": "4.0.0",
             "mdgriffith/elm-ui": "1.1.8",
             "phollyer/elm-ui-colors": "3.0.0"
         },
         "indirect": {
             "elm/json": "1.1.2",
             "elm/parser": "1.1.0",
+            "elm/svg": "1.0.1",
             "elm/time": "1.0.0",
             "elm/url": "1.0.0",
             "elm/virtual-dom": "1.0.2",
