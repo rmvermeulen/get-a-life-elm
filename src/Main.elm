@@ -451,7 +451,13 @@ update msg model =
             simply { model | style = Animation.update animMsg model.style }
 
         AnimatedButtonMsg abMsg ->
-            simply { model | button = AnimatedButton.update abMsg model.button }
+            let
+                ( button, cmd ) =
+                    AnimatedButton.update abMsg model.button
+            in
+            ( { model | button = button }
+            , Cmd.map AnimatedButtonMsg cmd
+            )
 
 
 

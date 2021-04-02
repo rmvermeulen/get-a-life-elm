@@ -7,6 +7,7 @@
     "dependencies": {
         "direct": {
             "ThinkAlexandria/elm-pretty-print-json": "1.0.1",
+            "avh4/elm-color": "1.0.0",
             "elm/browser": "1.0.2",
             "elm/core": "1.0.4",
             "elm/html": "1.0.0",
@@ -20,7 +21,6 @@
             "phollyer/elm-ui-colors": "3.0.0"
         },
         "indirect": {
-            "avh4/elm-color": "1.0.0",
             "elm/json": "1.1.2",
             "elm/parser": "1.1.0",
             "elm/svg": "1.0.1",
