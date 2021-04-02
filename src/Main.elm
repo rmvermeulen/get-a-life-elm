@@ -31,8 +31,8 @@ classToString class =
             "Elite"
 
 
-skinColorToString : SkinColor -> String
-skinColorToString skin =
+bodyInfoToString : BodyInfo -> String
+bodyInfoToString skin =
     case skin of
         White ->
             "White"
@@ -82,10 +82,10 @@ getBoxWidth profile =
         Complete _ ->
             200
 
-        Partial { mBirth, mClass, mSkinColor } ->
+        Partial { mBirth, mClass, mBodyInfo } ->
             [ mBirth |> Maybe.map birthToString
             , mClass |> Maybe.map classToString
-            , mSkinColor |> Maybe.map skinColorToString
+            , mBodyInfo |> Maybe.map bodyInfoToString
             ]
                 -- find the longest string's length
                 |> List.filterMap
@@ -120,7 +120,7 @@ emptyPartialProfile : Profile
 emptyPartialProfile =
     Partial
         { mBirth = Nothing
-        , mSkinColor = Nothing
+        , mBodyInfo = Nothing
         , mClass = Nothing
         }
 
@@ -129,8 +129,8 @@ emptyPartialProfile =
 ---- DATA ----
 
 
-getWeightedSkinColors : Place -> NonEmptyList (Weighted SkinColor)
-getWeightedSkinColors birthplace =
+getWeightedBodyInfos : Place -> NonEmptyList (Weighted BodyInfo)
+getWeightedBodyInfos birthplace =
     case birthplace of
         Europe ->
             ( ( 90, White )
@@ -202,11 +202,11 @@ genPlace =
         )
 
 
-genSkinColor : Place -> Year -> Random.Generator SkinColor
-genSkinColor birthplace _ =
+genBodyInfo : Place -> Year -> Random.Generator BodyInfo
+genBodyInfo birthplace _ =
     let
         ( head, rest ) =
-            getWeightedSkinColors birthplace
+            getWeightedBodyInfos birthplace
     in
     Random.weighted head rest
 
@@ -216,7 +216,7 @@ genBirth { yearRange } =
     Random.map2 Birth genPlace (genYear yearRange)
 
 
-genClass : Place -> SkinColor -> Random.Generator Class
+genClass : Place -> BodyInfo -> Random.Generator Class
 genClass _ _ =
     randomPick ( Lower, [ Middle, Upper, Elite ] )
 
@@ -237,7 +237,7 @@ type Class
     | Elite
 
 
-type SkinColor
+type BodyInfo
     = White
     | Brown
     | Black
@@ -263,12 +263,12 @@ type alias Birth =
 type Profile
     = Partial
         { mBirth : Maybe Birth
-        , mSkinColor : Maybe SkinColor
+        , mBodyInfo : Maybe BodyInfo
         , mClass : Maybe Class
         }
     | Complete
         { birth : Birth
-        , skinColor : SkinColor
+        , bodyInfo : BodyInfo
         , class : Class
         }
 
@@ -324,10 +324,10 @@ init =
 type Msg
     = SetProfile Profile
     | GenBirth
-    | GenSkinColor Birth
-    | GenClass Birth SkinColor
+    | GenBodyInfo Birth
+    | GenClass Birth BodyInfo
     | SetBirth Birth
-    | SetSkinColor SkinColor
+    | SetBodyInfo BodyInfo
     | SetClass Class
     | CompleteProfile
     | Animate Animation.Msg
@@ -364,11 +364,11 @@ update msg model =
 
         -- GenBirthplace ->
         -- GenYear ->
-        GenSkinColor { place, year } ->
-            generate (genSkinColor place year) SetSkinColor
+        GenBodyInfo { place, year } ->
+            generate (genBodyInfo place year) SetBodyInfo
 
-        GenClass { place } skinColor ->
-            generate (genClass place skinColor) SetClass
+        GenClass { place } bodyInfo ->
+            generate (genClass place bodyInfo) SetClass
 
         SetBirth birth ->
             let
@@ -385,15 +385,15 @@ update msg model =
             in
             simply { model | profile = profile, style = style }
 
-        SetSkinColor skinColor ->
+        SetBodyInfo bodyInfo ->
             let
                 profile =
                     case model.profile of
                         Complete summary ->
-                            Complete { summary | skinColor = skinColor }
+                            Complete { summary | bodyInfo = bodyInfo }
 
                         Partial summary ->
-                            Partial { summary | mSkinColor = Just skinColor }
+                            Partial { summary | mBodyInfo = Just bodyInfo }
 
                 style =
                     animateBox profile
@@ -421,15 +421,15 @@ update msg model =
 
         CompleteProfile ->
             case model.profile of
-                Partial { mBirth, mSkinColor, mClass } ->
-                    case ( mBirth, mSkinColor, mClass ) of
-                        ( Just birth, Just skinColor, Just class ) ->
+                Partial { mBirth, mBodyInfo, mClass } ->
+                    case ( mBirth, mBodyInfo, mClass ) of
+                        ( Just birth, Just bodyInfo, Just class ) ->
                             simply
                                 { model
                                     | profile =
                                         Complete
                                             { birth = birth
-                                            , skinColor = skinColor
+                                            , bodyInfo = bodyInfo
                                             , class = class
                                             }
                                 }
@@ -485,15 +485,15 @@ viewProfile profile =
                 obj
     in
     case profile of
-        Partial { mBirth, mSkinColor, mClass } ->
+        Partial { mBirth, mBodyInfo, mClass } ->
             let
-                viewClass birth skinColor =
+                viewClass birth bodyInfo =
                     case mClass of
                         Nothing ->
                             plainButton
                                 []
                                 { label = text "What class am I in?"
-                                , onPress = Just <| GenClass birth skinColor
+                                , onPress = Just <| GenClass birth bodyInfo
                                 }
 
                         Just class ->
@@ -506,19 +506,19 @@ viewProfile profile =
                                     }
                                 ]
 
-                viewSkinColor birth =
-                    case mSkinColor of
+                viewBodyInfo birth =
+                    case mBodyInfo of
                         Nothing ->
                             plainButton
                                 []
                                 { label = text "What do I look like?"
-                                , onPress = Just <| GenSkinColor birth
+                                , onPress = Just <| GenBodyInfo birth
                                 }
 
-                        Just skinColor ->
+                        Just bodyInfo ->
                             column [ spacing 12 ]
-                                [ text <| skinColorToString skinColor
-                                , viewClass birth skinColor
+                                [ text <| bodyInfoToString bodyInfo
+                                , viewClass birth bodyInfo
                                 ]
 
                 viewBirth =
@@ -536,17 +536,17 @@ viewProfile profile =
                         Just birth ->
                             column [ spacing 12 ]
                                 [ text <| birthToString birth
-                                , viewSkinColor birth
+                                , viewBodyInfo birth
                                 ]
             in
             viewBirth
 
-        Complete { birth, class, skinColor } ->
+        Complete { birth, class, bodyInfo } ->
             column []
                 [ text "Summary:"
                 , birth |> birthToString |> text
                 , class |> classToString |> text
-                , skinColor |> skinColorToString |> text
+                , bodyInfo |> bodyInfoToString |> text
                 ]
 
 
