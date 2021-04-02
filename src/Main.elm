@@ -3,6 +3,7 @@ module Main exposing (..)
 import AnimatedButton
 import Browser
 import Colors.Opaque as Colors
+import Dict exposing (Dict)
 import Element as E exposing (Element)
 import Element.Background as Background
 import Element.Border as Border
@@ -328,7 +329,7 @@ type Msg
     | SetBodyInfo BodyInfo
     | SetClass Class
     | CompleteProfile
-    | AnimatedButtonMsg AnimatedButton.Msg
+    | AnimatedButtonMsg (AnimatedButton.Msg Msg)
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -420,11 +421,24 @@ update msg model =
 
         AnimatedButtonMsg abMsg ->
             let
-                ( button, cmd ) =
+                ( newModel, cmd1 ) =
+                    case abMsg of
+                        AnimatedButton.ButtonPressed id myMsg ->
+                            update myMsg model
+
+                        _ ->
+                            simply model
+
+                ( button, cmd2 ) =
                     AnimatedButton.update abMsg model.button
             in
-            ( { model | button = button }
-            , Cmd.map AnimatedButtonMsg cmd
+            ( { newModel | button = button }
+            , Cmd.batch
+                [ cmd1
+                , Cmd.map
+                    AnimatedButtonMsg
+                    cmd2
+                ]
             )
 
 
@@ -449,14 +463,12 @@ view model =
         , E.spacing 16
         , E.width E.shrink
         ]
-        [ viewProfile model.profile
-        , AnimatedButton.view model.button
-            |> E.map AnimatedButtonMsg
+        [ viewProfile model
         ]
 
 
-viewProfile : Profile -> Element Msg
-viewProfile profile =
+viewProfile : Model -> Element Msg
+viewProfile { profile, button } =
     let
         plainButton attrs obj =
             Input.button
@@ -469,30 +481,51 @@ viewProfile profile =
                 viewClass birth bodyInfo =
                     case mClass of
                         Nothing ->
-                            plainButton
-                                []
-                                { label = E.text "What class am I in?"
-                                , onPress = Just <| GenClass birth bodyInfo
-                                }
+                            let
+                                action =
+                                    Just <| \id -> AnimatedButton.ButtonPressed id (GenClass birth bodyInfo)
+
+                                mapping =
+                                    Dict.fromList
+                                        [ ( "Continue", ( "What class am I in", action ) )
+                                        ]
+                            in
+                            -- { label = E.text "What class am I in?"
+                            -- , onPress = Just <| GenClass birth bodyInfo
+                            -- }
+                            AnimatedButton.view mapping button
+                                |> E.map AnimatedButtonMsg
 
                         Just class ->
                             E.column [ E.spacing 12 ]
                                 [ E.text <| classToString class ++ " class"
-                                , plainButton
-                                    []
-                                    { label = E.text "Summarize"
-                                    , onPress = Just CompleteProfile
-                                    }
+                                , let
+                                    action =
+                                        Just <| \id -> AnimatedButton.ButtonPressed id CompleteProfile
+
+                                    mapping =
+                                        Dict.fromList
+                                            [ ( "Continue", ( "Summarize", action ) )
+                                            ]
+                                  in
+                                  AnimatedButton.view mapping button
+                                    |> E.map AnimatedButtonMsg
                                 ]
 
                 viewBodyInfo birth =
                     case mBodyInfo of
                         Nothing ->
-                            plainButton
-                                []
-                                { label = E.text "What do I look like?"
-                                , onPress = Just <| GenBodyInfo birth
-                                }
+                            let
+                                action =
+                                    Just <| \id -> AnimatedButton.ButtonPressed id (GenBodyInfo birth)
+
+                                mapping =
+                                    Dict.fromList
+                                        [ ( "Continue", ( "What do I look like?", action ) )
+                                        ]
+                            in
+                            AnimatedButton.view mapping button
+                                |> E.map AnimatedButtonMsg
 
                         Just bodyInfo ->
                             E.column [ E.spacing 12 ]
@@ -505,11 +538,17 @@ viewProfile profile =
                         Nothing ->
                             E.column [ E.spacing 12 ]
                                 [ E.text "Let put together a lifetime of stuff!"
-                                , plainButton
-                                    []
-                                    { label = E.text "Get a life!"
-                                    , onPress = Just GenBirth
-                                    }
+                                , let
+                                    action =
+                                        Just <| \id -> AnimatedButton.ButtonPressed id GenBirth
+
+                                    mapping =
+                                        Dict.fromList
+                                            [ ( "Continue", ( "Get a life!", action ) )
+                                            ]
+                                  in
+                                  AnimatedButton.view mapping button
+                                    |> E.map AnimatedButtonMsg
                                 ]
 
                         Just birth ->

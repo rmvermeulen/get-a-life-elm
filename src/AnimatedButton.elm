@@ -1,4 +1,4 @@
-module AnimatedButton exposing (Model, Msg, init, subscriptions, update, view)
+module AnimatedButton exposing (Model, Msg(..), init, subscriptions, update, view)
 
 import Animator
 import Color
@@ -8,6 +8,7 @@ import Element.Background as Background
 import Element.Border as Border
 import Element.Events as Events
 import Element.Font as Font
+import Html exposing (button)
 import Time
 
 
@@ -20,34 +21,37 @@ type State
     | Hover
 
 
-type Msg
+type Msg msg
     = RuntimeTriggeredAnimationStep Time.Posix
     | ButtonHoverStart Id
     | ButtonHoverEnd Id
+    | ButtonPressed Id msg
 
 
 type alias Model =
-    { states : Animator.Timeline (Dict Id State)
+    { buttonNames : List String
+    , states : Animator.Timeline (Dict Id State)
     }
 
 
-init : () -> ( Model, Cmd Msg )
+init : () -> ( Model, Cmd (Msg msg) )
 init _ =
     let
-        model =
-            { states =
-                Animator.init <|
-                    Dict.fromList
-                        [ ( "One", Default )
-                        , ( "Two", Default )
-                        , ( "Three", Default )
-                        ]
-            }
+        buttonNames =
+            [ "Continue" ]
     in
-    ( model, Cmd.none )
+    ( { buttonNames = buttonNames
+      , states =
+            Animator.init <|
+                Dict.fromList <|
+                    List.map (\name -> ( name, Default )) <|
+                        buttonNames
+      }
+    , Cmd.none
+    )
 
 
-update : Msg -> Model -> ( Model, Cmd Msg )
+update : Msg msg -> Model -> ( Model, Cmd (Msg msg) )
 update msg model =
     let
         maybeAlways value =
@@ -89,9 +93,12 @@ update msg model =
                             model.states
                 }
 
+        ButtonPressed id upperMsg ->
+            simply model
 
-view : Model -> Element Msg
-view model =
+
+view : Dict String ( String, Maybe (Id -> Msg msg) ) -> Model -> Element (Msg msg)
+view nameTextMap model =
     let
         buttonState id =
             Maybe.withDefault Default <| Dict.get id <| Animator.current model.states
@@ -137,23 +144,36 @@ view model =
                                 20
 
         button id =
+            let
+                ( name, mAction ) =
+                    Dict.get id nameTextMap
+                        |> Maybe.withDefault ( id, Nothing )
+            in
             E.el
-                [ E.width <| E.px 200
-                , E.height <| E.px 60
-                , Border.width 3
-                , Border.rounded 6
-                , Border.color <| borderColor id
-                , Background.color <| bgColor id
-                , Font.color <| fontColor id
-                , Font.size <| fontSize id
-                , E.padding 10
-                , Events.onMouseEnter <| ButtonHoverStart id
-                , Events.onMouseLeave <| ButtonHoverEnd id
-                ]
+                ([ E.width <| E.px 200
+                 , E.height <| E.px 60
+                 , Border.width 3
+                 , Border.rounded 6
+                 , Border.color <| borderColor id
+                 , Background.color <| bgColor id
+                 , Font.color <| fontColor id
+                 , Font.size <| fontSize id
+                 , E.padding 10
+                 , Events.onMouseEnter <| ButtonHoverStart id
+                 , Events.onMouseLeave <| ButtonHoverEnd id
+                 ]
+                    ++ (case mAction of
+                            Just action ->
+                                [ Events.onClick <| action id ]
+
+                            Nothing ->
+                                []
+                       )
+                )
             <|
-                (E.el [ E.centerX, E.centerY ] <| E.text <| "Button " ++ id)
+                (E.el [ E.centerX, E.centerY ] <| E.text <| name)
     in
-    [ "One", "Two", "Three" ]
+    model.buttonNames
         |> List.map button
         |> E.column [ E.spacing 10, E.centerX, E.centerY ]
 
@@ -168,6 +188,6 @@ animator =
             (\states -> List.any ((==) Hover) <| Dict.values states)
 
 
-subscriptions : Model -> Sub Msg
+subscriptions : Model -> Sub (Msg msg)
 subscriptions model =
     Animator.toSubscription RuntimeTriggeredAnimationStep model animator
