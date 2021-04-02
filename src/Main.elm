@@ -1,7 +1,6 @@
 module Main exposing (..)
 
 import AnimatedButton
-import Animation
 import Browser
 import Colors.Opaque as Colors
 import Element as E exposing (Element)
@@ -292,7 +291,6 @@ type alias Settings =
 type alias Model =
     { profile : Profile
     , settings : Settings
-    , style : Animation.State
     , button : AnimatedButton.Model
     }
 
@@ -306,18 +304,12 @@ init =
                 True
                 { indent = 2, columns = 120 }
 
-        style =
-            Animation.style
-                [ Animation.width (Animation.px 200)
-                ]
-
         ( button, abCmd ) =
             AnimatedButton.init ()
     in
     ( Model
         emptyPartialProfile
         settings
-        style
         button
     , Cmd.batch [ abCmd |> Cmd.map AnimatedButtonMsg ]
     )
@@ -336,7 +328,6 @@ type Msg
     | SetBodyInfo BodyInfo
     | SetClass Class
     | CompleteProfile
-    | Animate Animation.Msg
     | AnimatedButtonMsg AnimatedButton.Msg
 
 
@@ -351,16 +342,6 @@ update msg model =
 
         simply m =
             ( m, Cmd.none )
-
-        animateBox profile =
-            Animation.interrupt
-                [ Animation.to
-                    [ Animation.width <|
-                        Animation.px <|
-                            getBoxWidth profile
-                    ]
-                ]
-                model.style
     in
     case msg of
         SetProfile profile ->
@@ -386,11 +367,8 @@ update msg model =
 
                         Partial summary ->
                             Partial { summary | mBirth = Just birth }
-
-                style =
-                    animateBox profile
             in
-            simply { model | profile = profile, style = style }
+            simply { model | profile = profile }
 
         SetBodyInfo bodyInfo ->
             let
@@ -401,14 +379,10 @@ update msg model =
 
                         Partial summary ->
                             Partial { summary | mBodyInfo = Just bodyInfo }
-
-                style =
-                    animateBox profile
             in
             simply
                 { model
                     | profile = profile
-                    , style = style
                 }
 
         SetClass class ->
@@ -420,11 +394,8 @@ update msg model =
 
                         Partial summary ->
                             Partial { summary | mClass = Just class }
-
-                style =
-                    animateBox profile
             in
-            simply { model | profile = profile, style = style }
+            simply { model | profile = profile }
 
         CompleteProfile ->
             case model.profile of
@@ -447,9 +418,6 @@ update msg model =
                 _ ->
                     simply model
 
-        Animate animMsg ->
-            simply { model | style = Animation.update animMsg model.style }
-
         AnimatedButtonMsg abMsg ->
             let
                 ( button, cmd ) =
@@ -466,29 +434,21 @@ update msg model =
 
 view : Model -> Element Msg
 view model =
-    let
-        animations =
-            Animation.render model.style
-                |> List.map E.htmlAttribute
-                |> List.map (E.mapAttribute Animate)
-    in
     E.column
-        (animations
-            ++ [ E.centerX
-               , E.alignTop
-               , Background.color Colors.white
-               , E.padding 12
-               , Border.width 1
-               , Border.shadow
-                    { blur = 4
-                    , color = Colors.black
-                    , offset = ( 2, 1 )
-                    , size = 1
-                    }
-               , E.spacing 16
-               , E.width E.shrink
-               ]
-        )
+        [ E.centerX
+        , E.alignTop
+        , Background.color Colors.white
+        , E.padding 12
+        , Border.width 1
+        , Border.shadow
+            { blur = 4
+            , color = Colors.black
+            , offset = ( 2, 1 )
+            , size = 1
+            }
+        , E.spacing 16
+        , E.width E.shrink
+        ]
         [ viewProfile model.profile
         , AnimatedButton.view model.button
             |> E.map AnimatedButtonMsg
@@ -576,9 +536,7 @@ viewProfile profile =
 subscriptions : Model -> Sub Msg
 subscriptions model =
     Sub.batch
-        [ Animation.subscription Animate
-            [ model.style ]
-        , AnimatedButton.subscriptions model.button
+        [ AnimatedButton.subscriptions model.button
             |> Sub.map AnimatedButtonMsg
         ]
 

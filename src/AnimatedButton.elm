@@ -18,7 +18,6 @@ type alias Id =
 type State
     = Default
     | Hover
-    | Pressed
 
 
 type Msg
@@ -65,6 +64,10 @@ update msg model =
             simply <| Animator.update delta animator model
 
         ButtonHoverStart id ->
+            let
+                _ =
+                    Debug.log "hover start" id
+            in
             simply <|
                 { model
                     | states =
@@ -74,6 +77,10 @@ update msg model =
                 }
 
         ButtonHoverEnd id ->
+            let
+                _ =
+                    Debug.log "hover end" id
+            in
             simply <|
                 { model
                     | states =
@@ -146,7 +153,7 @@ view model =
             <|
                 (E.el [ E.centerX, E.centerY ] <| E.text <| "Button " ++ id)
     in
-    [ "Uno", "Dos", "Tres" ]
+    [ "One", "Two", "Three" ]
         |> List.map button
         |> E.column [ E.spacing 10, E.centerX, E.centerY ]
 
