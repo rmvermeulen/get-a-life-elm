@@ -306,7 +306,9 @@ init =
                 { indent = 2, columns = 120 }
 
         ( button, abCmd ) =
-            AnimatedButton.init ()
+            AnimatedButton.init
+                [ AnimatedButton.ButtonConfig "birth" "Be born!"
+                ]
     in
     ( Model
         emptyPartialProfile
@@ -329,7 +331,7 @@ type Msg
     | SetBodyInfo BodyInfo
     | SetClass Class
     | CompleteProfile
-    | AnimatedButtonMsg (AnimatedButton.Msg Msg)
+    | AnimatedButtonMsg AnimatedButton.Msg
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -423,7 +425,16 @@ update msg model =
             let
                 ( newModel, cmd1 ) =
                     case abMsg of
-                        AnimatedButton.ButtonPressed id myMsg ->
+                        AnimatedButton.ButtonPressed id ->
+                            let
+                                myMsg =
+                                    case id of
+                                        "birth" ->
+                                            GenBirth
+
+                                        _ ->
+                                            Debug.todo <| "Unimplemented Button id '" ++ id ++ "'"
+                            in
                             update myMsg model
 
                         _ ->
@@ -481,50 +492,23 @@ viewProfile { profile, button } =
                 viewClass birth bodyInfo =
                     case mClass of
                         Nothing ->
-                            let
-                                action =
-                                    Just <| \id -> AnimatedButton.ButtonPressed id (GenClass birth bodyInfo)
-
-                                mapping =
-                                    Dict.fromList
-                                        [ ( "Continue", ( "What class am I in", action ) )
-                                        ]
-                            in
                             -- { label = E.text "What class am I in?"
                             -- , onPress = Just <| GenClass birth bodyInfo
                             -- }
-                            AnimatedButton.view mapping button
+                            AnimatedButton.view button
                                 |> E.map AnimatedButtonMsg
 
                         Just class ->
                             E.column [ E.spacing 12 ]
                                 [ E.text <| classToString class ++ " class"
-                                , let
-                                    action =
-                                        Just <| \id -> AnimatedButton.ButtonPressed id CompleteProfile
-
-                                    mapping =
-                                        Dict.fromList
-                                            [ ( "Continue", ( "Summarize", action ) )
-                                            ]
-                                  in
-                                  AnimatedButton.view mapping button
+                                , AnimatedButton.view button
                                     |> E.map AnimatedButtonMsg
                                 ]
 
                 viewBodyInfo birth =
                     case mBodyInfo of
                         Nothing ->
-                            let
-                                action =
-                                    Just <| \id -> AnimatedButton.ButtonPressed id (GenBodyInfo birth)
-
-                                mapping =
-                                    Dict.fromList
-                                        [ ( "Continue", ( "What do I look like?", action ) )
-                                        ]
-                            in
-                            AnimatedButton.view mapping button
+                            AnimatedButton.view button
                                 |> E.map AnimatedButtonMsg
 
                         Just bodyInfo ->
@@ -538,16 +522,7 @@ viewProfile { profile, button } =
                         Nothing ->
                             E.column [ E.spacing 12 ]
                                 [ E.text "Let put together a lifetime of stuff!"
-                                , let
-                                    action =
-                                        Just <| \id -> AnimatedButton.ButtonPressed id GenBirth
-
-                                    mapping =
-                                        Dict.fromList
-                                            [ ( "Continue", ( "Get a life!", action ) )
-                                            ]
-                                  in
-                                  AnimatedButton.view mapping button
+                                , AnimatedButton.view button
                                     |> E.map AnimatedButtonMsg
                                 ]
 

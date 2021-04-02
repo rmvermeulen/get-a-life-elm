@@ -1,4 +1,4 @@
-module AnimatedButton exposing (Model, Msg(..), init, subscriptions, update, view)
+module AnimatedButton exposing (ButtonConfig, Model, Msg(..), init, subscriptions, update, view)
 
 import Animator
 import Color
@@ -21,37 +21,50 @@ type State
     | Hover
 
 
-type Msg msg
+type Msg
     = RuntimeTriggeredAnimationStep Time.Posix
     | ButtonHoverStart Id
     | ButtonHoverEnd Id
-    | ButtonPressed Id msg
+    | ButtonPressed Id
+
+
+type alias ButtonConfig =
+    { id : Id
+    , text : String
+
+    -- , action : Id -> Msg
+    }
 
 
 type alias Model =
-    { buttonNames : List String
+    { buttonConfigs : Dict Id ButtonConfig
     , states : Animator.Timeline (Dict Id State)
     }
 
 
-init : () -> ( Model, Cmd (Msg msg) )
-init _ =
+init : List ButtonConfig -> ( Model, Cmd Msg )
+init configs =
     let
-        buttonNames =
-            [ "Continue" ]
+        buttonConfigs =
+            configs
+                |> List.map (\v -> ( v.id, v ))
+                |> Dict.fromList
+
+        states =
+            configs
+                |> List.map .id
+                |> List.map (\name -> ( name, Default ))
+                |> Dict.fromList
+                |> Animator.init
     in
-    ( { buttonNames = buttonNames
-      , states =
-            Animator.init <|
-                Dict.fromList <|
-                    List.map (\name -> ( name, Default )) <|
-                        buttonNames
-      }
+    ( Model
+        buttonConfigs
+        states
     , Cmd.none
     )
 
 
-update : Msg msg -> Model -> ( Model, Cmd (Msg msg) )
+update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     let
         maybeAlways value =
@@ -93,12 +106,12 @@ update msg model =
                             model.states
                 }
 
-        ButtonPressed id upperMsg ->
+        ButtonPressed id ->
             simply model
 
 
-view : Dict String ( String, Maybe (Id -> Msg msg) ) -> Model -> Element (Msg msg)
-view nameTextMap model =
+view : Model -> Element Msg
+view model =
     let
         buttonState id =
             Maybe.withDefault Default <| Dict.get id <| Animator.current model.states
@@ -143,37 +156,35 @@ view nameTextMap model =
                             else
                                 20
 
-        button id =
+        button config =
             let
-                ( name, mAction ) =
-                    Dict.get id nameTextMap
-                        |> Maybe.withDefault ( id, Nothing )
+                { id } =
+                    config
+
+                text =
+                    model.buttonConfigs
+                        |> Dict.get id
+                        |> Maybe.map .text
+                        |> Maybe.withDefault "[No button text!]"
             in
             E.el
-                ([ E.width <| E.px 200
-                 , E.height <| E.px 60
-                 , Border.width 3
-                 , Border.rounded 6
-                 , Border.color <| borderColor id
-                 , Background.color <| bgColor id
-                 , Font.color <| fontColor id
-                 , Font.size <| fontSize id
-                 , E.padding 10
-                 , Events.onMouseEnter <| ButtonHoverStart id
-                 , Events.onMouseLeave <| ButtonHoverEnd id
-                 ]
-                    ++ (case mAction of
-                            Just action ->
-                                [ Events.onClick <| action id ]
-
-                            Nothing ->
-                                []
-                       )
-                )
+                [ E.width <| E.px 200
+                , E.height <| E.px 60
+                , Border.width 3
+                , Border.rounded 6
+                , Border.color <| borderColor id
+                , Background.color <| bgColor id
+                , Font.color <| fontColor id
+                , Font.size <| fontSize id
+                , E.padding 10
+                , Events.onMouseEnter <| ButtonHoverStart id
+                , Events.onMouseLeave <| ButtonHoverEnd id
+                ]
             <|
-                (E.el [ E.centerX, E.centerY ] <| E.text <| name)
+                (E.el [ E.centerX, E.centerY ] <| E.text <| text)
     in
-    model.buttonNames
+    model.buttonConfigs
+        |> Dict.values
         |> List.map button
         |> E.column [ E.spacing 10, E.centerX, E.centerY ]
 
@@ -188,6 +199,6 @@ animator =
             (\states -> List.any ((==) Hover) <| Dict.values states)
 
 
-subscriptions : Model -> Sub (Msg msg)
+subscriptions : Model -> Sub Msg
 subscriptions model =
     Animator.toSubscription RuntimeTriggeredAnimationStep model animator
