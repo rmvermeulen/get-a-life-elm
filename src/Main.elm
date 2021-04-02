@@ -3,7 +3,7 @@ module Main exposing (..)
 import Animation
 import Browser
 import Colors.Opaque as Colors
-import Element exposing (..)
+import Element as E exposing (Element)
 import Element.Background as Background
 import Element.Border as Border
 import Element.Input as Input
@@ -453,16 +453,16 @@ view model =
     let
         animations =
             Animation.render model.style
-                |> List.map htmlAttribute
-                |> List.map (mapAttribute Animate)
+                |> List.map E.htmlAttribute
+                |> List.map (E.mapAttribute Animate)
     in
     viewProfile model.profile
-        |> el
+        |> E.el
             (animations
-                ++ [ centerX
-                   , alignTop
+                ++ [ E.centerX
+                   , E.alignTop
                    , Background.color Colors.white
-                   , padding 12
+                   , E.padding 12
                    , Border.width 1
                    , Border.shadow
                         { blur = 4
@@ -470,8 +470,8 @@ view model =
                         , offset = ( 2, 1 )
                         , size = 1
                         }
-                   , spacing 16
-                   , width shrink
+                   , E.spacing 16
+                   , E.width E.shrink
                    ]
             )
 
@@ -481,7 +481,7 @@ viewProfile profile =
     let
         plainButton attrs obj =
             Input.button
-                ([ Border.width 1, padding 8 ] ++ attrs)
+                ([ Border.width 1, E.padding 8 ] ++ attrs)
                 obj
     in
     case profile of
@@ -492,16 +492,16 @@ viewProfile profile =
                         Nothing ->
                             plainButton
                                 []
-                                { label = text "What class am I in?"
+                                { label = E.text "What class am I in?"
                                 , onPress = Just <| GenClass birth bodyInfo
                                 }
 
                         Just class ->
-                            column [ spacing 12 ]
-                                [ text <| classToString class ++ " class"
+                            E.column [ E.spacing 12 ]
+                                [ E.text <| classToString class ++ " class"
                                 , plainButton
                                     []
-                                    { label = text "Summarize"
+                                    { label = E.text "Summarize"
                                     , onPress = Just CompleteProfile
                                     }
                                 ]
@@ -511,42 +511,42 @@ viewProfile profile =
                         Nothing ->
                             plainButton
                                 []
-                                { label = text "What do I look like?"
+                                { label = E.text "What do I look like?"
                                 , onPress = Just <| GenBodyInfo birth
                                 }
 
                         Just bodyInfo ->
-                            column [ spacing 12 ]
-                                [ text <| bodyInfoToString bodyInfo
+                            E.column [ E.spacing 12 ]
+                                [ E.text <| bodyInfoToString bodyInfo
                                 , viewClass birth bodyInfo
                                 ]
 
                 viewBirth =
                     case mBirth of
                         Nothing ->
-                            column [ spacing 12 ]
-                                [ text "Let put together a lifetime of stuff!"
+                            E.column [ E.spacing 12 ]
+                                [ E.text "Let put together a lifetime of stuff!"
                                 , plainButton
                                     []
-                                    { label = text "Get a life!"
+                                    { label = E.text "Get a life!"
                                     , onPress = Just GenBirth
                                     }
                                 ]
 
                         Just birth ->
-                            column [ spacing 12 ]
-                                [ text <| birthToString birth
+                            E.column [ E.spacing 12 ]
+                                [ E.text <| birthToString birth
                                 , viewBodyInfo birth
                                 ]
             in
             viewBirth
 
         Complete { birth, class, bodyInfo } ->
-            column []
-                [ text "Summary:"
-                , birth |> birthToString |> text
-                , class |> classToString |> text
-                , bodyInfo |> bodyInfoToString |> text
+            E.column []
+                [ E.text "Summary:"
+                , birth |> birthToString |> E.text
+                , class |> classToString |> E.text
+                , bodyInfo |> bodyInfoToString |> E.text
                 ]
 
 
@@ -568,8 +568,8 @@ main =
     Browser.element
         { view =
             view
-                >> layout
-                    [ padding 18
+                >> E.layout
+                    [ E.padding 18
                     , Border.solid
                     , Background.color Colors.aliceblue
                     ]
