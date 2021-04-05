@@ -1,6 +1,7 @@
 module Main exposing (..)
 
 import AnimatedButton
+import Animation
 import Browser
 import Colors.Opaque as Colors
 import Dict exposing (Dict)
@@ -27,7 +28,7 @@ getBoxWidth : Profile -> Float
 getBoxWidth profile =
     case profile of
         Complete _ ->
-            200
+            300
 
         Partial { mBirth, mClass, mBodyInfo } ->
             [ mBirth |> Maybe.map Birth.toString
@@ -43,6 +44,27 @@ getBoxWidth profile =
                 |> (*) 12
                 -- add double the padding
                 |> (+) 32
+
+
+getBoxHeight : Profile -> Float
+getBoxHeight profile =
+    case profile of
+        Complete _ ->
+            160
+
+        Partial { mBirth, mClass, mBodyInfo } ->
+            let
+                count =
+                    Maybe.map (always 1) >> Maybe.withDefault 0
+
+                sum =
+                    [ mBirth |> count
+                    , mClass |> count
+                    , mBodyInfo |> count
+                    ]
+                        |> List.foldl (+) 0
+            in
+            50 + 30 * sum
 
 
 type alias Weighted value =
@@ -181,6 +203,7 @@ type alias Model =
     { profile : Profile
     , settings : Settings
     , button : AnimatedButton.Model
+    , style : Animation.State
     }
 
 
@@ -195,13 +218,19 @@ init =
 
         ( button, abCmd ) =
             AnimatedButton.init
-                [ AnimatedButton.ButtonConfig "birth" "Be born!"
+                [ AnimatedButton.ButtonConfig "birth" "Be born!" ]
+
+        style =
+            Animation.style
+                [ Animation.width (Animation.px 400)
+                , Animation.height (Animation.px 100)
                 ]
     in
     ( Model
         emptyPartialProfile
         settings
         button
+        style
     , Cmd.batch [ abCmd |> Cmd.map AnimatedButtonMsg ]
     )
 
@@ -233,6 +262,19 @@ update msg model =
 
         simply m =
             ( m, Cmd.none )
+
+        animateBox profile =
+            Animation.interrupt
+                [ Animation.to
+                    [ Animation.width <|
+                        Animation.px <|
+                            getBoxWidth profile
+                    , Animation.height <|
+                        Animation.px <|
+                            getBoxHeight profile
+                    ]
+                ]
+                model.style
     in
     case msg of
         SetProfile profile ->
