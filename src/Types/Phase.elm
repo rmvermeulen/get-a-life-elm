@@ -6,7 +6,7 @@ type Phase
     | Childhood
     | Teens
     | EarlyAdulthood
-    | AdultHood
+    | Adulthood
     | LateAdulthood
     | Elder
 
@@ -26,8 +26,8 @@ toString phase =
         EarlyAdulthood ->
             "Early Adulthood"
 
-        AdultHood ->
-            "AdultHood"
+        Adulthood ->
+            "Adulthood"
 
         LateAdulthood ->
             "Late Adulthood"
