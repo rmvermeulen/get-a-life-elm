@@ -10,71 +10,17 @@ import Element.Border as Border
 import Element.Input as Input
 import Random
 import Random.List
+import Types.Birth as Birth exposing (Birth)
+import Types.BodyInfo as BodyInfo exposing (BodyInfo(..))
+import Types.Class as Class exposing (Class(..))
+import Types.Place exposing (Place(..))
+import Types.Profile exposing (Profile(..))
+import Types.Settings exposing (Settings)
+import Types.Year exposing (Year)
 
 
 
 ---- HELPERS ----
-
-
-classToString : Class -> String
-classToString class =
-    case class of
-        Lower ->
-            "Lower"
-
-        Middle ->
-            "Middle"
-
-        Upper ->
-            "Upper"
-
-        Elite ->
-            "Elite"
-
-
-bodyInfoToString : BodyInfo -> String
-bodyInfoToString skin =
-    case skin of
-        White ->
-            "White"
-
-        Brown ->
-            "Brown"
-
-        Black ->
-            "Black"
-
-
-placeToString : Place -> String
-placeToString place =
-    case place of
-        Afrika ->
-            "Afrika"
-
-        Asia ->
-            "Asia"
-
-        Australia ->
-            "Australia"
-
-        Europe ->
-            "Europe"
-
-        NorthAmerica ->
-            "North America"
-
-        SouthAmerica ->
-            "South America"
-
-
-yearToString : Year -> String
-yearToString year =
-    String.fromInt year
-
-
-birthToString : Birth -> String
-birthToString { place, year } =
-    placeToString place ++ ", " ++ yearToString year
 
 
 getBoxWidth : Profile -> Float
@@ -84,9 +30,9 @@ getBoxWidth profile =
             200
 
         Partial { mBirth, mClass, mBodyInfo } ->
-            [ mBirth |> Maybe.map birthToString
-            , mClass |> Maybe.map classToString
-            , mBodyInfo |> Maybe.map bodyInfoToString
+            [ mBirth |> Maybe.map Birth.toString
+            , mClass |> Maybe.map Class.toString
+            , mBodyInfo |> Maybe.map BodyInfo.toString
             ]
                 -- find the longest string's length
                 |> List.filterMap
@@ -219,7 +165,7 @@ genBirth { yearRange } =
 
 genClass : Place -> BodyInfo -> Random.Generator Class
 genClass _ _ =
-    randomPick ( Lower, [ Middle, Upper, Elite ] )
+    randomPick ( Class.Lower, [ Class.Middle, Class.Upper, Class.Elite ] )
 
 
 genYear : ( Int, Int ) -> Random.Generator Year
@@ -229,64 +175,6 @@ genYear ( from, to ) =
 
 
 ---- MODEL ----
-
-
-type Class
-    = Lower
-    | Middle
-    | Upper
-    | Elite
-
-
-type BodyInfo
-    = White
-    | Brown
-    | Black
-
-
-type Place
-    = Europe
-    | NorthAmerica
-    | SouthAmerica
-    | Afrika
-    | Asia
-    | Australia
-
-
-type alias Year =
-    Int
-
-
-type alias Birth =
-    { place : Place, year : Year }
-
-
-type Profile
-    = Partial
-        { mBirth : Maybe Birth
-        , mBodyInfo : Maybe BodyInfo
-        , mClass : Maybe Class
-        }
-    | Complete
-        { birth : Birth
-        , bodyInfo : BodyInfo
-        , class : Class
-        }
-
-
-
--- profileName : Profile -> String
--- profileName profile =case profile of
-
-
-type alias Settings =
-    { yearRange : ( Int, Int )
-    , previewEnabled : Bool
-    , json :
-        { indent : Int
-        , columns : Int
-        }
-    }
 
 
 type alias Model =
@@ -500,9 +388,12 @@ viewProfile { profile, button } =
 
                         Just class ->
                             E.column [ E.spacing 12 ]
-                                [ E.text <| classToString class ++ " class"
-                                , AnimatedButton.view button
-                                    |> E.map AnimatedButtonMsg
+                                [ E.text <| Class.toString class ++ " class"
+                                , plainButton
+                                    []
+                                    { label = E.text "Summarize"
+                                    , onPress = Just CompleteProfile
+                                    }
                                 ]
 
                 viewBodyInfo birth =
@@ -513,7 +404,7 @@ viewProfile { profile, button } =
 
                         Just bodyInfo ->
                             E.column [ E.spacing 12 ]
-                                [ E.text <| bodyInfoToString bodyInfo
+                                [ E.text <| BodyInfo.toString bodyInfo
                                 , viewClass birth bodyInfo
                                 ]
 
@@ -528,7 +419,7 @@ viewProfile { profile, button } =
 
                         Just birth ->
                             E.column [ E.spacing 12 ]
-                                [ E.text <| birthToString birth
+                                [ E.text <| Birth.toString birth
                                 , viewBodyInfo birth
                                 ]
             in
@@ -537,9 +428,9 @@ viewProfile { profile, button } =
         Complete { birth, class, bodyInfo } ->
             E.column []
                 [ E.text "Summary:"
-                , birth |> birthToString |> E.text
-                , class |> classToString |> E.text
-                , bodyInfo |> bodyInfoToString |> E.text
+                , birth |> Birth.toString |> E.text
+                , class |> Class.toString |> E.text
+                , bodyInfo |> BodyInfo.toString |> E.text
                 ]
 
 
